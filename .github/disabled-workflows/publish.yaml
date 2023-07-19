@@ -27,7 +27,7 @@ jobs:
 
       - name: Build Package
         env:
-          {{REPO_NAME_ALLCAPS}}_VERSION: ${{ github.event.release.tag_name }}
+          GROUPED_QUERY_ATTENTION_PYTORCH_VERSION: ${{ github.event.release.tag_name }}
         run: python -m build
 
       - name: Publish to PyPI

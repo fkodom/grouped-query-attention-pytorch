@@ -2,7 +2,7 @@
 line-length = 88
 
 [tool.mypy]
-files = "{{REPO_NAME_SNAKECASE}}/"
+files = "grouped_query_attention_pytorch/"
 check_untyped_defs = "true"
 ignore_missing_imports = "true"
 

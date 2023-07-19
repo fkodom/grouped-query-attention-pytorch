@@ -1,5 +1,5 @@
 [run]
-source = {{REPO_NAME_SNAKECASE}}
+source = grouped_query_attention_pytorch
 
 [report]
 exclude_lines =

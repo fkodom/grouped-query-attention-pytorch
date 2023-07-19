@@ -7,7 +7,7 @@ import setuptools
 
 def get_version_tag() -> str:
     try:
-        env_key = "{{REPO_NAME_ALLCAPS}}_VERSION".upper()
+        env_key = "GROUPED_QUERY_ATTENTION_PYTORCH_VERSION".upper()
         version = os.environ[env_key]
     except KeyError:
         version = getoutput("git describe --tags --abbrev=0")
@@ -25,11 +25,11 @@ extras_require["all"] = all_require
 
 
 setup(
-    name="{{REPO_NAME}}",
+    name="grouped-query-attention-pytorch",
     version=get_version_tag(),
-    author="{{GIT_USER_NAME}}",
-    author_email="{{GIT_USER_EMAIL}}",
-    url="https://github.com/{{REPO_OWNER}}/{{REPO_NAME}}",
+    author="Frank Odom",
+    author_email="frank.odom.iii@mgmail.com",
+    url="https://github.com/fkodom/grouped-query-attention-pytorch",
     packages=setuptools.find_packages(exclude=["tests"]),
     description="project_description",
     long_description=open("README.md").read(),
