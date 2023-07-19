@@ -1,0 +1,42 @@
+name: Test Slow
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types: [opened]
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    strategy:
+      matrix:
+        python: ["3.10"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Templatize
+        # Templatize the repo before attempting to run tests.  (Tests will fail
+        # otherwise, due to syntax errors.)
+        # NOTE: Check if the 'templatize' script exists, so that this doesn't
+        # immediately fail for repos that have already run the script.
+        run: |
+          if test -f "templatize"; then
+              ./templatize
+          fi
+
+      - name: Install Package
+        run: |
+          pip install -e .[test]
+
+      - name: Test
+        run: pytest --slow --cov --cov-report term-missing --cov-fail-under 80 tests/

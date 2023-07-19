@@ -1,0 +1,49 @@
+[tool.black]
+line-length = 88
+
+[tool.mypy]
+files = "{{REPO_NAME_SNAKECASE}}/"
+check_untyped_defs = "true"
+ignore_missing_imports = "true"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov --cov-report term-missing --cov-fail-under 80"
+filterwarnings = "ignore:.*.:DeprecationWarning"
+
+[tool.ruff]
+ignore = ["B905", "E501"]
+line-length = 88
+select = [
+    "B",
+    "C",
+    "E",
+    "F",
+    "I",
+    "W"
+]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".hg",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "venv",
+]
+
+[tool.ruff.mccabe]
+max-complexity = 18

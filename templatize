@@ -1,0 +1,82 @@
+#!/usr/bin/env python3
+
+import shutil
+from pathlib import Path
+from subprocess import getoutput
+from typing import Dict, List, Sequence, Tuple, Union
+
+THIS_FILE = Path(__file__).expanduser().absolute()
+REPO_DIR = THIS_FILE.parent
+
+
+def get_git_info(key: str) -> str:
+    return getoutput(f"git config {key}").strip()
+
+
+def get_repo_owner_and_name() -> Tuple[str, str]:
+    owner, name = (
+        get_git_info("remote.origin.url")
+        .replace("https://github.com/", "")
+        .replace("git@github.com:", "")
+        .replace(".git", "")
+        .split("/", maxsplit=1)
+    )
+    return owner, name
+
+
+def recursive_get_files(
+    root_dir: Union[Path, str], excepted_files: Sequence[Union[str, Path]] = ()
+) -> List[Path]:
+    if isinstance(root_dir, str):
+        root_dir = Path(root_dir)
+    return [x for x in root_dir.glob("**/*") if x not in excepted_files and x.is_file()]
+
+
+REPO_OWNER, REPO_NAME = get_repo_owner_and_name()
+PLACEHOLDERS = {
+    "{{REPO_NAME}}": REPO_NAME,
+    "{{REPO_OWNER}}": REPO_OWNER,
+    "{{REPO_NAME_SNAKECASE}}": REPO_NAME.replace("-", "_"),
+    "{{REPO_NAME_ALLCAPS}}": REPO_NAME.upper().replace("-", "_"),
+    "{{GIT_USER_NAME}}": get_git_info("user.name"),
+    "{{GIT_USER_EMAIL}}": get_git_info("user.email"),
+}
+
+
+def substitute_placeholders(path: Union[str, Path], placeholder_map: Dict[str, str]):
+    # Replace placeholders in file names
+    for placeholder, value in placeholder_map.items():
+        if placeholder in str(path):
+            dest = Path(str(path).replace(placeholder, value))
+            dest.parent.mkdir(exist_ok=True)
+            path = shutil.move(path, dest)
+
+    # Attempt to read *text* contents from file
+    try:
+        with open(path, "r") as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        # file is binary
+        return
+
+    # Replace placeholders in file contents
+    for placeholder, value in placeholder_map.items():
+        if placeholder in content:
+            content = content.replace(placeholder, value)
+
+    # Write modified contents back to file
+    with open(path, "w") as f:
+        f.write(content)
+
+
+def main():
+    git_files = recursive_get_files(REPO_DIR / ".git")
+    for filename in recursive_get_files(REPO_DIR, excepted_files=git_files):
+        substitute_placeholders(filename, placeholder_map=PLACEHOLDERS)
+
+    THIS_FILE.unlink()
+    Path("{{REPO_NAME_SNAKECASE}}").rmdir()
+
+
+if __name__ == "__main__":
+    main()
