@@ -13,7 +13,7 @@ def scaled_dot_product_attention(
     dropout: float = 0.0,
     scale: Optional[float] = None,
     mask: Optional[Tensor] = None,
-    batch_first: bool = False,
+    batch_first: bool = True,  # TODO: require 'batch_first=True'
     force_grouped: bool = False,
 ):
     """Compute scaled dot product attention.
@@ -46,14 +46,14 @@ def scaled_dot_product_attention(
             f"{query.shape}, {key.shape}, and {value.shape}."
         )
 
-    if not batch_first:
-        query = rearrange(query, "n b h d -> b n h d")
-        key = rearrange(key, "n b h d -> b n h d")
-        value = rearrange(value, "n b h d -> b n h d")
+    in_signature = "b n h d" if batch_first else "n b h d"
+    query = rearrange(query, f"{in_signature} -> b h n d")
+    key = rearrange(key, f"{in_signature} -> b h n d")
+    value = rearrange(value, f"{in_signature} -> b h n d")
 
-    bq, _, hq, dq = query.shape
-    bk, nk, hk, dk = key.shape
-    bv, nv, hv, dv = value.shape
+    bq, hq, nq, dq = query.shape
+    bk, hk, nk, dk = key.shape
+    bv, hv, nv, dv = value.shape
     if not (bq == bk == bv and dq == dk == dv):
         raise ValueError(
             "Expected query, key, and value to have the same batch size (dim=0) and "
@@ -77,25 +77,34 @@ def scaled_dot_product_attention(
 
     num_groups = hq // hk
     if num_groups > 1 or force_grouped:
-        query = rearrange(query, "b n (g h) d -> b n g h d", g=num_groups)
-        similarity = einsum(query, key, "b n g h d, b s h d -> b n s h")
+        # query = query.reshape(bq, num_groups, -1, nq, dq)
+        # key = key.unsqueeze(1)
+        # similarity = torch.bmm(query, key.transpose(-2, -1)).sum(dim=1)
+        # print(query.shape)
+        query = rearrange(query, "b (g h) n d -> b g h n d", g=num_groups)
+        # print(query.shape)
+        similarity = einsum(query, key, "b g h n d, b h s d -> b h n s")
+        # print(similarity.shape)
+        # breakpoint()
     else:
-        similarity = einsum(query, key, "b n h d, b s h d -> b n s h")
+        similarity = einsum(query, key, "b h n d, b h s d -> b h n s")
 
     if mask is not None:
         if mask.ndim == 2:
-            mask = rearrange(mask, "b n -> b n () ()")
+            mask = rearrange(mask, "b s -> b () () s")
         elif mask.ndim == 3:
-            mask = rearrange(mask, "b n s -> b n s ()")
+            mask = rearrange(mask, "b n s -> b () n s")
         similarity.masked_fill_(~mask, float("-inf"))
 
     attention = F.softmax(similarity / scale, dim=-1)
     if dropout > 0.0:
         attention = F.dropout(attention, p=dropout)
 
-    out = einsum(attention, value, "b n s h, b s h d -> b n h d")
-    if not batch_first:
-        out = rearrange(out, "b n h d -> n b h d")
+    out = einsum(attention, value, "b h n s, b h s d -> b h n d")
+    if batch_first:
+        out = rearrange(out, "b h n d -> b n h d")
+    else:
+        out = rearrange(out, "b h n d -> n b h d")
 
     return out
 

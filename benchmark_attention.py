@@ -12,11 +12,11 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
 
 # Benchmarking parameters
-TOTAL_TOKENS = 2**18  # 256k
-NUM_HEADS = 12
+TOTAL_TOKENS = 8192
+NUM_HEADS = 64
 EMBED_DIM = 8
-GROUPS = [1, 2, 3, 4, 6, 12]
-SEQ_LENGTHS = [2**i for i in range(10, 16)]  # 1k - 32k
+GROUPS = [1, 4, 8, 16, 32, 64]
+SEQ_LENGTHS = [512, 1024, 2048]
 
 
 class BenchmarkResult(NamedTuple):
@@ -94,6 +94,7 @@ if __name__ == "__main__":
             batch_size, seq_length, NUM_HEADS, EMBED_DIM, device=DEVICE, dtype=DTYPE
         )
 
+        _ = scaled_dot_product_attention(q, kv, kv)
         result = benchmark(scaled_dot_product_attention, q, kv, kv)
         logging.info(f"Vanilla: {result}")
         result = benchmark(xops.memory_efficient_attention, q, kv, kv)
