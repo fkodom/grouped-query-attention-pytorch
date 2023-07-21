@@ -34,7 +34,11 @@ setup(
     description="project_description",
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
-    install_requires=[],
+    install_requires=[
+        # TODO: Check the full range of supported versions
+        "torch>=1.8.0",
+        "einops~=0.6.0",
+    ],
     extras_require=extras_require,
     classifiers=[
         "Programming Language :: Python :: 3",
