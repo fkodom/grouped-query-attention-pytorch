@@ -13,25 +13,29 @@ def scaled_dot_product_attention(
     dropout: float = 0.0,
     scale: Optional[float] = None,
     mask: Optional[Tensor] = None,
-    batch_first: bool = True,  # TODO: require 'batch_first=True'
     force_grouped: bool = False,
 ):
-    """Compute scaled dot product attention.
+    """Scaled dot product attention with support for grouped queries.
+
+    Notation:
+    - b: batch size
+    - n / s: sequence length
+    - h: number of heads
+    - d: dimension of query/key/value
 
     Args:
-        query: Query tensor.
-        key: Key tensor.
-        value: Value tensor.
-        scale: Scale factor for attention.
-        mask: Mask tensor.
-        is_causal: Whether the attention is causal.
-
-    NOTE: The 'mask' and 'is_causal' arguments cannot be used together.  If 'is_causal'
-    is provided, we assume either a lower triangular mask (is_causal=True) or no
-    mask at all (is_causal=False).
+        query: Query tensor of shape (b, n, h, d)
+        key: Key tensor of shape (b, s, h, d)
+        value: Value tensor of shape (b, s, h, d)
+        dropout: Dropout probability (default: 0.0)
+        scale: Scale factor for query (default: d_query ** 0.5)
+        mask: Mask tensor of shape (b, n, s) or (b, s). If 'ndim == 2', the mask is
+            applied to all 'n' rows of the attention matrix. (default: None)
+        force_grouped: If True, apply grouped-query attention even if the number of
+            heads is equal for query, key, and value. (default: False)
 
     Returns:
-        The attention tensor.
+        Tensor of shape (b, n, s, d)
     """
     # einstein notation:
     # - b: batch size
@@ -46,12 +50,12 @@ def scaled_dot_product_attention(
             f"{query.shape}, {key.shape}, and {value.shape}."
         )
 
-    in_signature = "b n h d" if batch_first else "n b h d"
-    query = rearrange(query, f"{in_signature} -> b h n d")
-    key = rearrange(key, f"{in_signature} -> b h n d")
-    value = rearrange(value, f"{in_signature} -> b h n d")
+    # Move sequence length dimension to axis 2
+    query = rearrange(query, "b n h d -> b h n d")
+    key = rearrange(key, "b n h d -> b h n d")
+    value = rearrange(value, "b n h d -> b h n d")
 
-    bq, hq, nq, dq = query.shape
+    bq, hq, _, dq = query.shape
     bk, hk, nk, dk = key.shape
     bv, hv, nv, dv = value.shape
     if not (bq == bk == bv and dq == dk == dv):
@@ -77,15 +81,8 @@ def scaled_dot_product_attention(
 
     num_groups = hq // hk
     if num_groups > 1 or force_grouped:
-        # query = query.reshape(bq, num_groups, -1, nq, dq)
-        # key = key.unsqueeze(1)
-        # similarity = torch.bmm(query, key.transpose(-2, -1)).sum(dim=1)
-        # print(query.shape)
         query = rearrange(query, "b (g h) n d -> b g h n d", g=num_groups)
-        # print(query.shape)
         similarity = einsum(query, key, "b g h n d, b h s d -> b h n s")
-        # print(similarity.shape)
-        # breakpoint()
     else:
         similarity = einsum(query, key, "b h n d, b h s d -> b h n s")
 
@@ -101,10 +98,8 @@ def scaled_dot_product_attention(
         attention = F.dropout(attention, p=dropout)
 
     out = einsum(attention, value, "b h n s, b h s d -> b h n d")
-    if batch_first:
-        out = rearrange(out, "b h n d -> b n h d")
-    else:
-        out = rearrange(out, "b h n d -> n b h d")
+    # Move head dimension back to axis 2
+    out = rearrange(out, "b h n d -> b n h d")
 
     return out
 

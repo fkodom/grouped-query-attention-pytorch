@@ -18,7 +18,18 @@ def get_version_tag() -> str:
     return version
 
 
-extras_require = {"test": ["black", "mypy", "pytest", "pytest-cov", "ruff", "xformers"]}
+extras_require = {
+    "test": [
+        "black",
+        "kaleido",
+        "mypy",
+        "plotly",
+        "pytest",
+        "pytest-cov",
+        "ruff",
+        "xformers==0.0.20",
+    ]
+}
 extras_require["dev"] = ["pre-commit", *extras_require["test"]]
 all_require = [r for reqs in extras_require.values() for r in reqs]
 extras_require["all"] = all_require

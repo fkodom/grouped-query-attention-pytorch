@@ -1,8 +1,9 @@
-import logging
+import os
 from math import ceil
 from timeit import Timer
 from typing import Callable, List, NamedTuple
 
+import plotly.graph_objects as go
 import torch
 import xformers.ops as xops
 
@@ -15,8 +16,19 @@ DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
 TOTAL_TOKENS = 8192
 NUM_HEADS = 64
 EMBED_DIM = 8
-GROUPS = [1, 4, 8, 16, 32, 64]
-SEQ_LENGTHS = [512, 1024, 2048]
+SEQ_LENGTH = 2048
+NUM_GROUPS = [1, 4, 8, 16, 32, 64]
+
+BENCHMARK_SETTINGS_TEMPLATE = """
+Benchmark settings:
+    device: {device}
+    dtype: {dtype}
+    total_tokens: {total_tokens}
+    batch_size: {batch_size}
+    seq_length: {seq_length}
+    num_heads: {num_heads}
+    embed_dim: {embed_dim}
+"""
 
 
 class BenchmarkResult(NamedTuple):
@@ -35,7 +47,7 @@ def benchmark(
     fn: Callable,
     *args,
     min_total_seconds: float = 1.0,
-    min_iterations: int = 2,
+    min_iterations: int = 10,
     **kwargs,
 ) -> BenchmarkResult:
     # Benchmark the runtime of a function and dynamically determine the number of
@@ -45,24 +57,28 @@ def benchmark(
         raise ValueError("min_iterations must be >= 2")
 
     timer = Timer(
-        "fn(*args, **kwargs)",
-        globals={"fn": fn, "args": args, "kwargs": kwargs},
+        "fn(*args, **kwargs); synchronize()",
+        globals={
+            "fn": fn,
+            "args": args,
+            "kwargs": kwargs,
+            "synchronize": torch.cuda.synchronize,
+        },
     )
-    # Run the function once to warm up
-    _ = timer.repeat(number=1, repeat=1)
+    # Run the function 5 times to warm up
+    _ = timer.repeat(number=1, repeat=5)
 
     times: List[float] = []
     total_time = 0.0
-    num_iterations = min_iterations or 1
+    num_iterations = min_iterations
 
     while total_time < min_total_seconds:
         _times = timer.repeat(number=1, repeat=num_iterations)
         times.extend(_times)
-        _total_time = sum(_times)
-        total_time += _total_time
 
-        # Estimate how many more iterations we need to run to get to 1 second
-        avg_time = _total_time / num_iterations
+        times_tensor = torch.as_tensor(times)
+        total_time = times_tensor.sum().item()
+        avg_time = times_tensor.mean().item()
         num_iterations = ceil((min_total_seconds - total_time) / avg_time)
 
     times_tensor = torch.as_tensor(times)
@@ -73,37 +89,84 @@ def benchmark(
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    logging.info(
-        f"""Benchmark settings:
-    device: {DEVICE}
-    dtype: {DTYPE}
-    total_tokens: {TOTAL_TOKENS}
-    num_heads: {NUM_HEADS}
-    embed_dim: {EMBED_DIM}
-"""
+    batch_size = TOTAL_TOKENS // SEQ_LENGTH
+    print(
+        BENCHMARK_SETTINGS_TEMPLATE.format(
+            device=DEVICE,
+            dtype=DTYPE,
+            total_tokens=TOTAL_TOKENS,
+            batch_size=batch_size,
+            seq_length=SEQ_LENGTH,
+            num_heads=NUM_HEADS,
+            embed_dim=EMBED_DIM,
+        )
     )
 
-    for seq_length in SEQ_LENGTHS:
-        logging.info(f"--- seq_length={seq_length} ---")
-        batch_size = TOTAL_TOKENS // seq_length
-        q = torch.randn(
-            batch_size, seq_length, NUM_HEADS, EMBED_DIM, device=DEVICE, dtype=DTYPE
-        )
-        kv = torch.randn(
-            batch_size, seq_length, NUM_HEADS, EMBED_DIM, device=DEVICE, dtype=DTYPE
-        )
+    q = torch.randn(
+        batch_size, SEQ_LENGTH, NUM_HEADS, EMBED_DIM, device=DEVICE, dtype=DTYPE
+    )
+    kv = torch.randn(
+        batch_size, SEQ_LENGTH, NUM_HEADS, EMBED_DIM, device=DEVICE, dtype=DTYPE
+    )
 
-        _ = scaled_dot_product_attention(q, kv, kv)
-        result = benchmark(scaled_dot_product_attention, q, kv, kv)
-        logging.info(f"Vanilla: {result}")
-        result = benchmark(xops.memory_efficient_attention, q, kv, kv)
-        logging.info(f"Efficient: {result}")
-        for g in GROUPS:
-            kv = torch.randn(
-                batch_size, seq_length, g, EMBED_DIM, dtype=DTYPE, device=DEVICE
-            )
-            result = benchmark(
-                scaled_dot_product_attention, q, kv, kv, force_grouped=True
-            )
-            logging.info(f"Grouped (g={g}): {result}")
+    _ = scaled_dot_product_attention(q, kv, kv)
+    vanilla_result = benchmark(scaled_dot_product_attention, q, kv, kv)
+    print(f"Vanilla: {vanilla_result}")
+    xformers_result = benchmark(xops.memory_efficient_attention, q, kv, kv)
+    print(f"Efficient: {xformers_result}")
+
+    grouped_times: List[BenchmarkResult] = []
+    for g in NUM_GROUPS:
+        kv = torch.randn(
+            batch_size, SEQ_LENGTH, g, EMBED_DIM, dtype=DTYPE, device=DEVICE
+        )
+        grouped_result = benchmark(
+            scaled_dot_product_attention, q, kv, kv, force_grouped=True
+        )
+        grouped_times.append(grouped_result)
+        print(f"Grouped (g={g}): {grouped_result}")
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=NUM_GROUPS,
+            y=[vanilla_result.mean * 1000] * len(NUM_GROUPS),
+            mode="lines",
+            line={"dash": "dash"},
+            name="Vanilla",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=NUM_GROUPS,
+            y=[grouped_times[0].mean * 1000] * len(NUM_GROUPS),
+            mode="lines",
+            line={"dash": "dash"},
+            name="Multi-Query",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=NUM_GROUPS,
+            y=[r.mean * 1000 for r in grouped_times],
+            mode="lines",
+            name="Grouped-Query",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=NUM_GROUPS,
+            y=[xformers_result.mean * 1000] * len(NUM_GROUPS),
+            mode="lines",
+            line={"dash": "dash"},
+            name="Mem-Efficient (xformers)",
+        )
+    )
+    fig.update_layout(
+        title="Attention Benchmarks",
+        xaxis_title="Number of Groups",
+        yaxis_title="Runtime (ms)",
+        # use log-scale for x-axis
+        xaxis={"tickmode": "array", "tickvals": NUM_GROUPS, "type": "log"},
+    )
+    fig.write_image(os.path.join("doc", "benchmark_attention.png"))
