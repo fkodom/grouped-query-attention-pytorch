@@ -5,6 +5,8 @@ import torch.nn.functional as F
 from einops import einsum, rearrange
 from torch import Tensor
 
+# TODO: GroupedQueryAttention class
+
 
 def scaled_dot_product_attention(
     query: Tensor,
@@ -79,9 +81,9 @@ def scaled_dot_product_attention(
         scale = query.size(-1) ** 0.5
     query = query / scale
 
-    num_groups = hq // hk
-    if num_groups > 1 or force_grouped:
-        query = rearrange(query, "b (g h) n d -> b g h n d", g=num_groups)
+    heads_per_group = hq // hk
+    if heads_per_group > 1 or force_grouped:
+        query = rearrange(query, "b (g h) n d -> b g h n d", g=heads_per_group)
         similarity = einsum(query, key, "b g h n d, b h s d -> b h n s")
     else:
         similarity = einsum(query, key, "b h n d, b h s d -> b h n s")
