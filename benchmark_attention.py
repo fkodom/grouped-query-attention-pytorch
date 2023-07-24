@@ -7,7 +7,9 @@ import plotly.graph_objects as go
 import torch
 import xformers.ops as xops
 
-from grouped_query_attention_pytorch.attention import scaled_dot_product_attention
+from grouped_query_attention_pytorch.attention import (
+    grouped_scaled_dot_product_attention,
+)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -109,8 +111,8 @@ if __name__ == "__main__":
         batch_size, SEQ_LENGTH, NUM_HEADS, EMBED_DIM, device=DEVICE, dtype=DTYPE
     )
 
-    _ = scaled_dot_product_attention(q, kv, kv)
-    vanilla_result = benchmark(scaled_dot_product_attention, q, kv, kv)
+    _ = grouped_scaled_dot_product_attention(q, kv, kv)
+    vanilla_result = benchmark(grouped_scaled_dot_product_attention, q, kv, kv)
     print(f"Vanilla: {vanilla_result}")
     xformers_result = benchmark(xops.memory_efficient_attention, q, kv, kv)
     print(f"Efficient: {xformers_result}")
@@ -121,7 +123,7 @@ if __name__ == "__main__":
             batch_size, SEQ_LENGTH, g, EMBED_DIM, dtype=DTYPE, device=DEVICE
         )
         grouped_result = benchmark(
-            scaled_dot_product_attention, q, kv, kv, force_grouped=True
+            grouped_scaled_dot_product_attention, q, kv, kv, force_grouped=True
         )
         grouped_times.append(grouped_result)
         print(f"Grouped (g={g}): {grouped_result}")
