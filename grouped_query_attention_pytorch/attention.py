@@ -87,7 +87,7 @@ def grouped_scaled_dot_product_attention(
 
     heads_per_group = hq // hk
     if heads_per_group > 1 or force_grouped:
-        query = rearrange(query, "b (g h) n d -> b g h n d", g=heads_per_group)
+        query = rearrange(query, "b (h g) n d -> b g h n d", g=heads_per_group)
         similarity = einsum(query, key, "b g h n d, b h s d -> b h n s")
     else:
         similarity = einsum(query, key, "b h n d, b h s d -> b h n s")
@@ -193,11 +193,6 @@ class GroupedQueryAttention(nn.Module):
         self.v_proj = nn.Linear(
             embed_dim, kv_embed_dim, bias=bias, device=device, dtype=dtype
         )
-        # self.attention = DilatedAttention(
-        #     segment_lengths=segment_lengths,
-        #     dilation_rates=dilation_rates,
-        #     attention_dropout=dropout,
-        # )
         self.norm: Optional[nn.LayerNorm] = None
         if layer_norm:
             self.norm = nn.LayerNorm(
