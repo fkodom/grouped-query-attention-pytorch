@@ -6,7 +6,7 @@ import torch
 from torch import Tensor
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
-from grouped_query_attention_pytorch.t5 import convert_t5_to_grouped_query_attention
+from grouped_query_attention_pytorch.t5 import convert_t5_to_gqa
 from grouped_query_attention_pytorch.utils.benchmark import BenchmarkResult, benchmark
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -109,7 +109,7 @@ def main(
         t5 = T5ForConditionalGeneration.from_pretrained(model_name).to(
             device=device, dtype=dtype
         )
-        gqa = convert_t5_to_grouped_query_attention(t5, kv_heads=g, inplace=True)
+        gqa = convert_t5_to_gqa(t5, kv_heads=g, inplace=True)
         grouped_result = benchmark(forward_fn, gqa, input_ids, labels)
         grouped_times.append(grouped_result)
         print(f"Grouped (g={g}): {grouped_result}")

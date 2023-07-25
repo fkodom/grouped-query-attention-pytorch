@@ -1,5 +1,6 @@
 [run]
-source = grouped_query_attention_pytorch
+source = grouped_query_attention_pytorch/
+omit = grouped_query_attention_pytorch/utils/benchmark.py
 
 [report]
 exclude_lines =

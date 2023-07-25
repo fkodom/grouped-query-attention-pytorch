@@ -51,8 +51,9 @@ setup(
     long_description_content_type="text/markdown",
     install_requires=[
         # TODO: Check the full range of supported versions
-        "torch>=1.8.0",
         "einops~=0.6.0",
+        "torch>=1.8.0",
+        "torchscale~=0.2.0",
     ],
     extras_require=extras_require,
     classifiers=[

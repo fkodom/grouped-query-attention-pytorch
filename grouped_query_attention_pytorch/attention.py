@@ -14,6 +14,8 @@ def grouped_scaled_dot_product_attention(
     scale: Optional[float] = None,
     mask: Optional[Tensor] = None,
     is_causal: Optional[bool] = None,
+    need_weights: bool = False,
+    average_attn_weights: bool = False,
     force_grouped: bool = False,
 ):
     """Scaled dot product attention with support for grouped queries.
@@ -36,7 +38,10 @@ def grouped_scaled_dot_product_attention(
             heads is equal for query, key, and value. (default: False)
 
     Returns:
-        Tensor of shape (b, n, s, d)
+        2-tuple of:
+        - Attention output with shape (b, n, h, d)
+        - (Optional) Attention weights with shape (b, h, n, s). Only returned if
+          'need_weights' is True.
     """
     if (mask is not None) and (is_causal is not None):
         raise ValueError(
@@ -115,11 +120,17 @@ def grouped_scaled_dot_product_attention(
     # Move head dimension back to axis 2
     out = rearrange(out, "b h n d -> b n h d")
 
-    return out
+    attn_weights: Optional[Tensor] = None
+    if need_weights:
+        attn_weights = rearrange(attention, "b h n s -> b h n s")
+        if average_attn_weights:
+            attn_weights = attn_weights.mean(dim=1)
+
+    return out, attn_weights
 
 
-class GroupedQueryAttention(nn.Module):
-    """Grouped query attention (GQA) layer.
+class MultiheadGQA(nn.Module):
+    """Multi-head grouped query attention (GQA) layer.
 
     Reference:
         "GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints"
@@ -145,8 +156,6 @@ class GroupedQueryAttention(nn.Module):
         embed_dim: int,
         query_heads: int,
         kv_heads: int,
-        # dilation_rates: Sequence[int],
-        # segment_lengths: Sequence[int],
         dropout: float = 0.0,
         bias: bool = True,
         layer_norm: bool = True,
@@ -186,7 +195,7 @@ class GroupedQueryAttention(nn.Module):
         self.q_proj = nn.Linear(
             embed_dim, embed_dim, bias=bias, device=device, dtype=dtype
         )
-        kv_embed_dim = embed_dim // kv_heads
+        kv_embed_dim = embed_dim // query_heads * kv_heads
         self.k_proj = nn.Linear(
             embed_dim, kv_embed_dim, bias=bias, device=device, dtype=dtype
         )
@@ -226,8 +235,16 @@ class GroupedQueryAttention(nn.Module):
             nn.init.constant_(self.out_proj.bias, 0)
 
     def forward(
-        self, query: Tensor, key: Tensor, value: Tensor, is_causal: bool = False
-    ) -> Tuple[Tensor, None]:
+        self,
+        query: Tensor,
+        key: Tensor,
+        value: Tensor,
+        need_weights: bool = False,
+        # TODO
+        # attn_mask: Optional[Tensor] = None,
+        is_causal: bool = False,
+        average_attn_weights: bool = False,
+    ) -> Tuple[Tensor, Optional[Tensor]]:
         # Notation:
         #   b - batch size
         #   n - sequence length
@@ -235,16 +252,26 @@ class GroupedQueryAttention(nn.Module):
         #   d - embedding dimension
         #
         # Input shape: (b, n, d)
-        q = self.q_proj(query)
-        k = self.k_proj(key)
-        v = self.v_proj(value)
+        q: Tensor = self.q_proj(query)
+        k: Tensor = self.k_proj(key)
+        v: Tensor = self.v_proj(value)
 
         # Unfold 'd' dimension into 'h' separate attention heads.
         q = rearrange(q, "b n (h d) -> b n h d", h=self.query_heads)
         k = rearrange(k, "b n (h d) -> b n h d", h=self.kv_heads)
         v = rearrange(v, "b n (h d) -> b n h d", h=self.kv_heads)
         # Apply attention, then fold 'h' attention heads back into 'd'.
-        x = grouped_scaled_dot_product_attention(q, k, v, is_causal=is_causal)
+        x, attn = grouped_scaled_dot_product_attention(
+            query=q,
+            key=k,
+            value=v,
+            # TODO
+            # mask=attn_mask,
+            is_causal=is_causal,
+            need_weights=need_weights,
+            average_attn_weights=average_attn_weights,
+            force_grouped=False,
+        )
         x = rearrange(x, "b n h d -> b n (h d)")
 
         # NOTE: This is different from 'nn.MultiheadAttention'! The LongNet paper
@@ -258,14 +285,4 @@ class GroupedQueryAttention(nn.Module):
         # Linear projection on attention outputs.
         x = self.out_proj(x)
 
-        return x, None
-
-
-if __name__ == "__main__":
-    q = torch.randn(2, 128, 64)
-    k = torch.randn(2, 128, 64)
-    v = torch.randn(2, 128, 64)
-
-    gqa = GroupedQueryAttention(embed_dim=64, query_heads=4, kv_heads=2)
-    with torch.no_grad():
-        out, _ = gqa(q, k, v)
+        return x, attn

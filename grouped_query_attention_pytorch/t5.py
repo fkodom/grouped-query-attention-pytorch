@@ -9,7 +9,7 @@ from torch import nn
 from transformers.models.t5.modeling_t5 import T5Attention
 
 
-class T5GroupedQueryAttention(nn.Module):
+class T5GQA(nn.Module):
     def __init__(
         self,
         is_decoder: bool,
@@ -64,10 +64,8 @@ class T5GroupedQueryAttention(nn.Module):
         self._relative_position_bucket = T5Attention._relative_position_bucket
 
     @classmethod
-    def from_t5_attention(
-        cls, t5: T5Attention, kv_heads: int
-    ) -> T5GroupedQueryAttention:
-        t5_gqa = T5GroupedQueryAttention(
+    def from_t5_attention(cls, t5: T5Attention, kv_heads: int) -> T5GQA:
+        t5_gqa = T5GQA(
             is_decoder=t5.is_decoder,
             d_model=t5.d_model,
             key_value_proj_dim=t5.key_value_proj_dim,
@@ -274,28 +272,26 @@ ModuleType = TypeVar("ModuleType", bound=nn.Module)
 
 
 @overload
-def convert_t5_to_grouped_query_attention(
+def convert_t5_to_gqa(
     module: ModuleType, kv_heads: int, inplace: bool = False
 ) -> ModuleType:
     ...
 
 
 @overload
-def convert_t5_to_grouped_query_attention(
+def convert_t5_to_gqa(
     module: T5Attention, kv_heads: int, inplace: bool = False
-) -> T5GroupedQueryAttention:
+) -> T5GQA:
     ...
 
 
-def convert_t5_to_grouped_query_attention(module, kv_heads: int, inplace: bool = False):
+def convert_t5_to_gqa(module, kv_heads: int, inplace: bool = False):
     if isinstance(module, T5Attention):
-        return T5GroupedQueryAttention.from_t5_attention(module, kv_heads=kv_heads)
+        return T5GQA.from_t5_attention(module, kv_heads=kv_heads)
 
     out = module if inplace else deepcopy(module)
     for name, child in out.named_children():
-        out._modules[name] = convert_t5_to_grouped_query_attention(
-            child, kv_heads=kv_heads, inplace=True
-        )
+        out._modules[name] = convert_t5_to_gqa(child, kv_heads=kv_heads, inplace=True)
     return out
 
 
@@ -324,7 +320,7 @@ if __name__ == "__main__":
     t5: T5ForConditionalGeneration = T5ForConditionalGeneration.from_pretrained(
         "t5-base"
     )
-    gqa = convert_t5_to_grouped_query_attention(t5, kv_heads=6)
+    gqa = convert_t5_to_gqa(t5, kv_heads=6)
 
     input_ids = tokenizer(
         "translate English to German: The house is wonderful.", return_tensors="pt"
