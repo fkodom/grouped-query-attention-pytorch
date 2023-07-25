@@ -1,3 +1,55 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+
+[project]
+name = "grouped_query_attention_pytorch"
+authors = [
+    {name = "Frank Odom", email = "frank.odom.iii@gmail.com"},
+]
+description = "project description"
+license = {text = "MIT"}
+dynamic = ["version", "readme"]  # NOTE: Must be in sync with [tool.setuptools.dynamic] below
+dependencies = [
+    # TODO: Check the full range of supported versions
+    "einops~=0.6.0",
+    "torch>=1.8.0",
+    "torchscale~=0.2.0",
+]
+requires-python = ">=3.8"
+classifiers = ["Programming Language :: Python :: 3"]
+
+[tool.setuptools.dynamic]
+# NOTE: Must be in sync with 'project.dynamic' above
+version = {attr = "grouped_query_attention_pytorch.VERSION"}
+readme = {file = ["README.md"]}
+
+[tool.setuptools.packages.find]
+exclude = ["tests"]
+
+# --- extra packages ---
+[project.optional-dependencies]
+test = [
+    "black",
+    "kaleido",
+    "mypy",
+    "plotly",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "xformers==0.0.20",
+]
+t5 = [
+    "sentencepiece",
+    "transformers>=4.5.0",
+]
+
+[project.scripts]
+# Entrypoint scripts
+
+
+# ----- Linting, Formatting, and Typing -----
+
 [tool.black]
 line-length = 88
 
@@ -12,16 +64,9 @@ addopts = "--cov --cov-report term-missing --cov-fail-under 80"
 filterwarnings = "ignore:.*.:DeprecationWarning"
 
 [tool.ruff]
-ignore = ["B905", "E501"]
 line-length = 88
-select = [
-    "B",
-    "C",
-    "E",
-    "F",
-    "I",
-    "W"
-]
+ignore = ["B905", "E501"]
+select = ["B", "C", "E", "F", "I", "W"]
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
