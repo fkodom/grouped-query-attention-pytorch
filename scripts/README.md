@@ -33,7 +33,7 @@ Even through `xformers` is much faster than the naive implementation, GQA is sti
 
 Similar to [benchmark_attention](#benchmark_attention) above, but we benchmark the end-to-end T5 model.  We compare the original T5 implementation with MHA to T5 with converted GQA.  
 
-The same hardware differences apply as above.  The original paper benchmarked T5-XXL (11B params), which does not fit in my GPU memory.  Instead, I benchmark T5-3B, which is the largest T5 variant that will fit in memory.  T5-3B only has 32 attention heads, so my benchmarks only go up to 32 GQA groups.  (The original benchmarks with T5-XXL go up to 64 groups.)
+The same hardware differences apply as above.  The original paper benchmarked T5-XXL (11B params), which does not fit in my GPU memory.  Instead, I benchmark T5-3B, which is the largest T5 variant that will fit in memory.  T5-3B only has 32 attention heads, so my benchmarks only go up to 32 GQA groups.  (The original benchmarks with T5-XXL go up to 64 groups.)  I use an input sequence length of 512 (similar to training) and a batch size of 8 (original uses 32).
 
 ### Reference
 https://arxiv.org/pdf/2305.13245v1.pdf, Figure 6

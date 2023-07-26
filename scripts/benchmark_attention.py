@@ -6,7 +6,7 @@ import torch
 import xformers.ops as xops
 
 from grouped_query_attention_pytorch.attention import (
-    grouped_scaled_dot_product_attention,
+    scaled_dot_product_gqa,
 )
 from grouped_query_attention_pytorch.utils.benchmark import BenchmarkResult, benchmark
 
@@ -50,8 +50,8 @@ def main(
         batch_size, seq_length, num_heads, embed_dim, device=device, dtype=dtype
     )
 
-    _ = grouped_scaled_dot_product_attention(q, kv, kv)
-    vanilla_result = benchmark(grouped_scaled_dot_product_attention, q, kv, kv)
+    _ = scaled_dot_product_gqa(q, kv, kv)
+    vanilla_result = benchmark(scaled_dot_product_gqa, q, kv, kv)
     print(f"Vanilla: {vanilla_result}")
     xformers_result = benchmark(xops.memory_efficient_attention, q, kv, kv)
     print(f"Flash Attn: {xformers_result}")
@@ -62,7 +62,7 @@ def main(
             batch_size, seq_length, g, embed_dim, dtype=dtype, device=device
         )
         grouped_result = benchmark(
-            grouped_scaled_dot_product_attention, q, kv, kv, force_grouped=True
+            scaled_dot_product_gqa, q, kv, kv, force_grouped=True
         )
         grouped_times.append(grouped_result)
         print(f"Grouped (g={g}): {grouped_result}")

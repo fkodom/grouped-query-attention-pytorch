@@ -6,7 +6,7 @@ from einops import einsum, rearrange
 from torch import Tensor, nn
 
 
-def grouped_scaled_dot_product_attention(
+def scaled_dot_product_gqa(
     query: Tensor,
     key: Tensor,
     value: Tensor,
@@ -122,7 +122,7 @@ def grouped_scaled_dot_product_attention(
 
     attn_weights: Optional[Tensor] = None
     if need_weights:
-        attn_weights = rearrange(attention, "b h n s -> b h n s")
+        attn_weights = rearrange(attention, "b h n s -> b n s h")
         if average_attn_weights:
             attn_weights = attn_weights.mean(dim=1)
 
@@ -261,7 +261,7 @@ class MultiheadGQA(nn.Module):
         k = rearrange(k, "b n (h d) -> b n h d", h=self.kv_heads)
         v = rearrange(v, "b n (h d) -> b n h d", h=self.kv_heads)
         # Apply attention, then fold 'h' attention heads back into 'd'.
-        x, attn = grouped_scaled_dot_product_attention(
+        x, attn = scaled_dot_product_gqa(
             query=q,
             key=k,
             value=v,
