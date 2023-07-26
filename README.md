@@ -2,6 +2,8 @@
 
 (Unofficial) PyTorch implementation of grouped-query attention (GQA) from [GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints](https://arxiv.org/pdf/2305.13245.pdf)
 
+<img src="doc/attention.png" alt="compare-attention-mechanisms" width="600"/>
+
 Includes:
 - [x] scaled dot-product attention with GQA support
     - See [scaled_dot_product_gqa usage](#scaled_dot_product_gqa)
