@@ -4,7 +4,7 @@
 
 <img src="doc/attention.png" alt="compare-attention-mechanisms" width="600"/>
 
-Includes:
+### Includes:
 - [x] scaled dot-product attention with GQA support
     - See [scaled_dot_product_gqa usage](#scaled_dot_product_gqa)
 - [x] GQA multi-head attention layer.
@@ -16,13 +16,13 @@ Includes:
 - [x] Reproduce runtime benchmarks from [GQA paper](https://arxiv.org/pdf/2305.13245.pdf) (Figure 6)
     - See [scripts/README.md](scripts/README.md)
 
-To do:
+### To do:
 - [ ] Fine-tuning code for T5 GQA models
 - [ ] Reproduce fine-tuning results from [GQA paper](https://arxiv.org/pdf/2305.13245.pdf) (Figures 3,5)
 
 ## Install
 
-PyPI:
+PyPI: (NOT YET AVAILABLE)
 ```bash
 pip install grouped-query-attention-pytorch
 ```
