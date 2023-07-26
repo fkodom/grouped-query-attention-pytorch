@@ -7,7 +7,7 @@
 pip install "grouped-query-attention-pytorch @ git+ssh://git@github.com/fkodom/grouped-query-attention-pytorch.git"
 
 # Install all dev dependencies (tests etc.)
-pip install "grouped-query-attention-pytorch[all] @ git+ssh://git@github.com/fkodom/grouped-query-attention-pytorch.git"
+pip install "grouped-query-attention-pytorch[test,t5] @ git+ssh://git@github.com/fkodom/grouped-query-attention-pytorch.git"
 
 # Setup pre-commit hooks
 pre-commit install
@@ -23,9 +23,6 @@ Tests run automatically through GitHub Actions.
 You can also run tests manually with `pytest`:
 ```bash
 pytest grouped-query-attention-pytorch
-
-# For all tests, including slow ones:
-pytest --slow grouped-query-attention-pytorch
 ```
 
 
