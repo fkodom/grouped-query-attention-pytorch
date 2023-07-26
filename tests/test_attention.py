@@ -3,7 +3,7 @@ import torch
 
 from grouped_query_attention_pytorch.attention import (
     MultiheadGQA,
-    grouped_scaled_dot_product_attention,
+    scaled_dot_product_gqa,
 )
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -26,10 +26,10 @@ def test_grouped_scaled_dot_product_attention(
 
     if kv_heads > num_heads:
         with pytest.raises(ValueError):
-            grouped_scaled_dot_product_attention(x, kv, kv, is_causal=is_causal)
+            scaled_dot_product_gqa(x, kv, kv, is_causal=is_causal)
         return
 
-    out, attn_weights = grouped_scaled_dot_product_attention(
+    out, attn_weights = scaled_dot_product_gqa(
         x, kv, kv, is_causal=is_causal, need_weights=True
     )
     assert out.size(0) == 1
@@ -37,9 +37,9 @@ def test_grouped_scaled_dot_product_attention(
     assert out.size(2) == kv_heads
     assert out.size(3) == embed_dim
     assert attn_weights.size(0) == 1
-    assert attn_weights.size(1) == kv_heads
+    assert attn_weights.size(1) == SEQ_LEN
     assert attn_weights.size(2) == SEQ_LEN
-    assert attn_weights.size(3) == SEQ_LEN
+    assert attn_weights.size(3) == kv_heads
 
 
 @torch.no_grad()
