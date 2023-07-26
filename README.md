@@ -17,6 +17,7 @@
     - See [scripts/README.md](scripts/README.md)
 
 ### To do:
+- [ ] More detailed comments / documentation on GQA inner workings
 - [ ] Fine-tuning code for T5 GQA models
 - [ ] Reproduce fine-tuning results from [GQA paper](https://arxiv.org/pdf/2305.13245.pdf) (Figures 3,5)
 
