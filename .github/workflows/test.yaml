@@ -35,7 +35,7 @@ jobs:
 
       - name: Install Package
         run: |
-          pip install -e .[test]
+          pip install -e .[test,t5]
 
       - name: Test
         run: |
