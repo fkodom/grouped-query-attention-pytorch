@@ -68,7 +68,7 @@ class GQATransformerEncoderLayer(nn.Module):
     def _reset_parameters(self):
         # NOTE: We follow the initialization strategy from MAGNETO.  See:
         # https://arxiv.org/pdf/2210.06423.pdf, Fig. 2
-        # The 'MultiheadDilatedAttention' module uses ths same initialization,
+        # The 'MultiheadGQA' module uses ths same initialization,
         # so we just need to worry about the 'Linear' modules here.
         nn.init.xavier_normal_(self.linear1.weight, gain=self.gamma_init)
         nn.init.constant_(self.linear1.bias, 0)
@@ -164,7 +164,7 @@ class GQATransformerDecoderLayer(nn.Module):
     def _reset_parameters(self):
         # NOTE: We follow the initialization strategy from MAGNETO.  See:
         # https://arxiv.org/pdf/2210.06423.pdf, Fig. 2
-        # The 'MultiheadDilatedAttention' module uses ths same initialization,
+        # The 'MultiheadGQA' module uses ths same initialization,
         # so we just need to worry about the 'Linear' modules here.
         nn.init.xavier_normal_(self.linear1.weight, gain=self.gamma_init)
         nn.init.constant_(self.linear1.bias, 0)
@@ -350,7 +350,4 @@ if __name__ == "__main__":
 
     with torch.no_grad():
         out = model(x)
-
     print(out.shape)
-    breakpoint()
-    pass

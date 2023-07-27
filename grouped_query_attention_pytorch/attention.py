@@ -20,10 +20,11 @@ def scaled_dot_product_gqa(
 ):
     """Scaled dot product attention with support for grouped queries.
 
-    Notation:
+    Einstein notation:
     - b: batch size
     - n / s: sequence length
     - h: number of heads
+    - g: number of groups
     - d: dimension of query/key/value
 
     Args:
@@ -52,13 +53,6 @@ def scaled_dot_product_gqa(
             f"Expected query, key, and value to be 4-dimensional, but got shapes "
             f"{query.shape}, {key.shape}, and {value.shape}."
         )
-
-    # einstein notation:
-    # - b: batch size
-    # - n / s: sequence length
-    # - h: number of heads
-    # - g: number of groups
-    # - d: dimension of query/key/value
 
     # Move sequence length dimension to axis 2.
     # This makes the attention operations below *much* faster.
@@ -90,38 +84,58 @@ def scaled_dot_product_gqa(
         scale = query.size(-1) ** 0.5
     query = query / scale
 
-    heads_per_group = hq // hk
-    if heads_per_group > 1 or force_grouped:
-        query = rearrange(query, "b (h g) n d -> b g h n d", g=heads_per_group)
+    num_head_groups = hq // hk
+    if num_head_groups > 1 or force_grouped:
+        # Separate the query heads into 'num_head_groups' chunks, and fold the group
+        # dimension into the batch dimension.  This allows us to compute the attention
+        # for each head in parallel, then sum over all of the groups at the end.
+        query = rearrange(query, "b (h g) n d -> b g h n d", g=num_head_groups)
         similarity = einsum(query, key, "b g h n d, b h s d -> b h n s")
     else:
+        # If the number of query/key heads is equal, we can skip grouping the queries,
+        # and just use the standard sdot product attention.
         similarity = einsum(query, key, "b h n d, b h s d -> b h n s")
 
     if is_causal:
-        diagonal = nq - nk + 1
+        # Mask out the upper triangular portion of the attention matrix. This prevents
+        # the model from attending to tokens in the future.
         mask = torch.ones(
             (bq, nq, nk),
             device=query.device,
             dtype=torch.bool,
-        ).triu_(diagonal)
+        ).tril_()
 
     if mask is not None:
+        # Expand mask to match the shape of the attention matrix.
+        # If mask is 2D, assume that it is applied to the key/value sequence dimension.
+        # Else if mask is 3D, assume that it is applied to the query/key/value sequence
+        # dimension for all attention heads.
+        #
+        # Users could also provide a 4D mask, which is applied to the query/key/value
+        # sequence dimension for each attention head (though I don't have a particular
+        # use case in mind for that).
         if mask.ndim == 2:
             mask = rearrange(mask, "b s -> b () () s")
         elif mask.ndim == 3:
             mask = rearrange(mask, "b n s -> b () n s")
-        similarity.masked_fill_(~mask, float("-inf"))
+        # Mask similarity values by setting them to negative infinity.  This guarantees
+        # that they will not contribute to the softmax computation below.
+        similarity.masked_fill_(~mask, torch.finfo(similarity.dtype).min)
 
     attention = F.softmax(similarity / scale, dim=-1)
     if dropout > 0.0:
         attention = F.dropout(attention, p=dropout)
 
+    # Apply attention matrix to the value Tensor.
     out = einsum(attention, value, "b h n s, b h s d -> b h n d")
     # Move head dimension back to axis 2
     out = rearrange(out, "b h n d -> b n h d")
 
     attn_weights: Optional[Tensor] = None
     if need_weights:
+        # Move the sequence dimensions back to positions 1, 2.  Move the head dimension
+        # to position 3.  This more closely matches the return shape of the attention
+        # output: (b, n, h, d).
         attn_weights = rearrange(attention, "b h n s -> b n s h")
         if average_attn_weights:
             attn_weights = attn_weights.mean(dim=1)
@@ -192,9 +206,12 @@ class MultiheadGQA(nn.Module):
                 f"head_dim (embed_dim / num_heads = {head_dim}) must be <= 128"
             )
 
+        # Query projection layer is the same as in vanilla MHA.
         self.q_proj = nn.Linear(
             embed_dim, embed_dim, bias=bias, device=device, dtype=dtype
         )
+        # Key/value projection layers have a smaller output dimension, so that
+        # the we have fewer key/value attention heads after reshaping.
         kv_embed_dim = embed_dim // query_heads * kv_heads
         self.k_proj = nn.Linear(
             embed_dim, kv_embed_dim, bias=bias, device=device, dtype=dtype
@@ -207,6 +224,9 @@ class MultiheadGQA(nn.Module):
             self.norm = nn.LayerNorm(
                 kv_embed_dim, eps=layer_norm_eps, device=device, dtype=dtype
             )
+        # Grouped attention output will have the same embedding dimension as the
+        # key/value Tensors.  So the output projection layer needs to accept the
+        # same dimension (kv_embed_dim).
         self.out_proj = nn.Linear(
             kv_embed_dim, embed_dim, bias=bias, device=device, dtype=dtype
         )
@@ -274,11 +294,11 @@ class MultiheadGQA(nn.Module):
         )
         x = rearrange(x, "b n h d -> b n (h d)")
 
-        # NOTE: This is different from 'nn.MultiheadAttention'! The LongNet paper
-        # follows the MAGNETO architecture, which applies an extra layer norm
-        # before the linear output projection.  The cross-attention layer in the
-        # MAGNETO decoder does not include this layer norm, so users have the option
-        # to disable it (layer_norm=False).
+        # NOTE: This is different from 'nn.MultiheadAttention'!  We follow the MAGNETO
+        # architecture (https://arxiv.org/pdf/2210.06423.pdf), which applies an extra
+        # layer norm before the linear output projection.  The cross-attention layer in
+        # the MAGNETO decoder does not include this layer norm, so users have the
+        # option to disable it (layer_norm=False).
         if self.layer_norm:
             assert self.norm is not None
             x = self.norm(x)
