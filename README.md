@@ -5,20 +5,15 @@
 <img src="doc/attention.png" alt="compare-attention-mechanisms" width="600"/>
 
 ### Includes:
-- [x] scaled dot-product attention with GQA support
-    - See [scaled_dot_product_gqa usage](#scaled_dot_product_gqa)
-- [x] GQA multi-head attention layer.
-    - See [MultiheadGQA usage](#multiheadgqa)
-- [x] Code to convert pretrained T5 model to use GQA. 
-    - See [T5 usage](#t5) 
-- [x] Prototype (untrained) GQA encoder-decoder models: `GQATransformer`, `GQATransformerLM`
-    - See [GQATransformer usage](#gqatransformer)
-- [x] Reproduce runtime benchmarks from [GQA paper](https://arxiv.org/pdf/2305.13245.pdf) (Figure 6)
-    - See [scripts/README.md](scripts/README.md)
+- [x] scaled dot-product attention with GQA support. (See: [scaled_dot_product_gqa usage](#scaled_dot_product_gqa))
+- [x] GQA multi-head attention layer.  (See: [MultiheadGQA usage](#multiheadgqa))
+- [x] Code to convert pretrained T5 model to use GQA.   (See: [T5 usage](#t5) )
+- [x] Prototype (untrained) GQA encoder-decoder models: `GQATransformer`, `GQATransformerLM`  (See: [GQATransformer )usage](#gqatransformer))
+- [x] Reproduce runtime benchmarks from [GQA paper](https://arxiv.org/pdf/2305.13245.pdf), figure 6  (See: [scripts/)README.md](scripts/README.md))
 
 ### To do:
 - [ ] Fine-tuning code for T5 GQA models
-- [ ] Reproduce fine-tuning results from [GQA paper](https://arxiv.org/pdf/2305.13245.pdf) (Figures 3,5)
+- [ ] Reproduce fine-tuning results from [GQA paper](https://arxiv.org/pdf/2305.13245.pdf), figures 3,5
 
 ## Install
 
