@@ -44,8 +44,8 @@ For more details, see [scripts/README.md](scripts/README.md#benchmark_t5)
 
 > Left: This repo <br> Right: Original paper
 <p float="left">
-    <img src="doc/benchmark_t5.png" alt="drawing" width="400"/>
-    <img src="doc/benchmark_t5_original.png" alt="drawing" width="400"/>
+<img src="doc/benchmark_t5.png" alt="drawing" width="400"/>
+<img src="doc/benchmark_t5_original.png" alt="drawing" width="400"/>
 </p>
 
 
