@@ -6,9 +6,12 @@ name = "grouped_query_attention_pytorch"
 authors = [
     {name = "Frank Odom", email = "frank.odom.iii@gmail.com"},
 ]
-description = "project description"
+description = "grouped-query-attention-pytorch"
 license = {text = "MIT"}
-dynamic = ["version", "readme"]  # NOTE: Must be in sync with [tool.setuptools.dynamic] below
+dynamic = [
+    "version",
+    "readme",
+]  # NOTE: Must be in sync with [tool.setuptools.dynamic] below
 dependencies = [
     # TODO: Check the full range of supported versions
     "einops~=0.6.0",
@@ -21,7 +24,7 @@ classifiers = ["Programming Language :: Python :: 3"]
 [tool.setuptools.dynamic]
 # NOTE: Must be in sync with 'project.dynamic' above
 version = {attr = "grouped_query_attention_pytorch.VERSION"}
-readme = {file = ["README.md"]}
+readme = {file = ["README.md"], content-type = "text/markdown"}
 
 [tool.setuptools.packages.find]
 exclude = ["tests"]
