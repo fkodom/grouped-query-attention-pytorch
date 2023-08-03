@@ -1,4 +1,3 @@
-from enum import Enum
 from math import log
 from typing import Callable, Optional, Union
 
@@ -75,22 +74,25 @@ class GQATransformerEncoderLayer(nn.Module):
         nn.init.xavier_normal_(self.linear2.weight, gain=self.gamma_init)
         nn.init.constant_(self.linear2.bias, 0)
 
-    def forward(self, src: Tensor, is_causal: bool = False) -> Tensor:
-        x = src
-
-        # Self-attention block
+    def _self_attention_block(self, x: Tensor, is_causal: bool = False) -> Tensor:
         x = self.norm1(x)
         x, _ = self.self_attn(x, x, x, is_causal=is_causal)
         x = self.dropout(x)
+        return x
 
-        # Feedforward block
+    def _feedforward_block(self, x: Tensor) -> Tensor:
         x = self.norm2(x)
         x = self.activation(self.linear1(x))
         x = self.dropout(x)
         x = self.norm3(x)
         x = self.linear2(x)
         x = self.dropout(x)
+        return x
 
+    def forward(self, src: Tensor, is_causal: bool = False) -> Tensor:
+        x = src
+        x = x + self._self_attention_block(x, is_causal=is_causal)
+        x = x + self._feedforward_block(x)
         return x
 
 
@@ -171,6 +173,29 @@ class GQATransformerDecoderLayer(nn.Module):
         nn.init.xavier_normal_(self.linear2.weight, gain=self.gamma_init)
         nn.init.constant_(self.linear2.bias, 0)
 
+    def _self_attention_block(self, x: Tensor, is_causal: bool = False) -> Tensor:
+        x = self.norm1(x)
+        x, _ = self.self_attn(x, x, x, is_causal=is_causal)
+        x = self.dropout(x)
+        return x
+
+    def _multihead_attention_block(
+        self, x: Tensor, memory: Tensor, is_causal: bool = False
+    ) -> Tensor:
+        x = self.norm2(x)
+        x, _ = self.multihead_attn(x, memory, memory, is_causal=is_causal)
+        x = self.dropout(x)
+        return x
+
+    def _feedforward_block(self, x: Tensor) -> Tensor:
+        x = self.norm3(x)
+        x = self.activation(self.linear1(x))
+        x = self.dropout(x)
+        x = self.norm4(x)
+        x = self.linear2(x)
+        x = self.dropout(x)
+        return x
+
     def forward(
         self,
         tgt: Tensor,
@@ -179,25 +204,9 @@ class GQATransformerDecoderLayer(nn.Module):
         memory_is_causal: bool = False,
     ) -> Tensor:
         x = tgt
-
-        # Self-attention block
-        x = self.norm1(x)
-        x, _ = self.self_attn(x, x, x, is_causal=tgt_is_causal)
-        x = self.dropout(x)
-
-        # Multihead attention block
-        x = self.norm2(x)
-        x, _ = self.multihead_attn(x, memory, memory, is_causal=memory_is_causal)
-        x = self.dropout(x)
-
-        # Feedforward block
-        x = self.norm3(x)
-        x = self.activation(self.linear1(x))
-        x = self.dropout(x)
-        x = self.norm4(x)
-        x = self.linear2(x)
-        x = self.dropout(x)
-
+        x = x + self._self_attention_block(x, is_causal=tgt_is_causal)
+        x = x + self._multihead_attention_block(x, memory, is_causal=memory_is_causal)
+        x = x + self._feedforward_block(x)
         return x
 
 
@@ -279,10 +288,6 @@ class GQATransformer(nn.Module):
             tgt = self.decoder.norm(tgt)
 
         return tgt
-
-
-class PositionalEncoding(str, Enum):
-    XPOS = "xpos"
 
 
 class GQATransformerLM(nn.Module):
