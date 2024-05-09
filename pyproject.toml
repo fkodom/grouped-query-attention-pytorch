@@ -44,7 +44,7 @@ test = [
 ]
 t5 = [
     "sentencepiece",
-    "transformers>=4.5.0",
+    "transformers>=4.5.0,<4.32",
 ]
 
 [project.scripts]
